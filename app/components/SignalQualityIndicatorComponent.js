@@ -1,6 +1,9 @@
 import React, { Component } from "react";
 import { isNil } from "lodash";
-import { Segment } from "semantic-ui-react";
+import { Segment, Image } from "semantic-ui-react";
+import { DEVICES } from "../constants/constants";
+import emotivDiagram from "../assets/device/epocDiagram.png"
+import museDiagram from "../assets/device/museDiagram.png";
 
 interface Props {
   signalQualityObservable: any;
@@ -24,7 +27,7 @@ class SignalQualityIndicatorComponent extends Component<Props> {
     }
   }
 
-  componentWillUnmount(){
+  componentWillUnmount() {
     this.signalQualitySubscription.unsubscribe();
   }
 
@@ -33,18 +36,24 @@ class SignalQualityIndicatorComponent extends Component<Props> {
       this.signalQualitySubscription.unsubscribe();
     }
 
-    this.signalQualitySubscription = observable.subscribe(
-      epoch => {
-        console.log(epoch.signalQuality);
-      },
-      error => new Error("Error in viewer subscription: ", error)
-    );
+    // this.signalQualitySubscription = observable.subscribe(
+    //   epoch => {
+    //     console.log(epoch.signalQuality);
+    //   },
+    //   error => new Error("Error in viewer subscription: ", error)
+    // );
   }
 
   render() {
     return (
-      <Segment>
-        <p>Signal Quality Indicator</p>
+      <Segment basic>
+        <Image
+          src={
+            this.props.deviceType === DEVICES.EMOTIV
+              ? emotivDiagram
+              : museDiagram
+          }
+        />
       </Segment>
     );
   }

@@ -173,31 +173,33 @@ const setRawObservableEpic = (action$, store) =>
         createRawMuseObservable(store.getState().device.client)
       );
     }),
-    mergeMap(observable =>
-      Observable.of(
+    mergeMap(observable => {
+      const samplingRate =
+        store.getState().device.deviceType === DEVICES.EMOTIV ? 128 : 256;
+      const nbChannels =
+        store.getState().device.deviceType === DEVICES.EMOTIV ? 14 : 5;
+      const intervalSamples = (PLOTTING_INTERVAL * samplingRate) / 1000;
+      return Observable.of(
         setRawObservable(observable),
         setSignalQualityObservable(
           observable.pipe(
             addInfo({
-              samplingRate: 256
+              samplingRate
             }),
             epoch({
-              duration: (PLOTTING_INTERVAL * 256) / 1000,
-              interval: (PLOTTING_INTERVAL * 256) / 1000
+              duration: intervalSamples,
+              interval: intervalSamples
             }),
             bandpassFilter({
-              nbChannels:
-                store.getState().device.deviceType === DEVICES.EMOTIV
-                  ? EMOTIV_CHANNELS.length
-                  : MUSE_CHANNELS.length,
+              nbChannels,
               lowCutoff: 1,
               highCutoff: 50
             }),
             addSignalQuality()
           )
         )
-      )
-    )
+      );
+    })
   );
 
 // const connectionStatusListenerEpic = action$ =>
