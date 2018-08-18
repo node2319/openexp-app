@@ -1,23 +1,14 @@
 import { combineEpics } from "redux-observable";
 import { Observable } from "rxjs";
-import {
-  map,
-  pluck,
-  mergeMap,
-  tap,
-  filter,
-  catchError,
-  ignoreElements,
-  timeout
-} from "rxjs/operators";
-import { isNil } from "lodash";
+import { map, pluck, mergeMap, tap, filter, catchError } from "rxjs/operators";
+import { epoch, bandpassFilter, addInfo } from "eeg-pipes";
+import { addSignalQuality } from "../utils/eeg/pipes";
 import {
   CONNECT_TO_DEVICE,
   SET_DEVICE_TYPE,
   SET_DEVICE_AVAILABILITY,
   setDeviceAvailability,
-  setConnectionStatus,
-  connectToDevice
+  setConnectionStatus
 } from "../actions/deviceActions";
 import {
   initCortex,
@@ -29,13 +20,15 @@ import {
   initMuseClient,
   getMuse,
   connectToMuse,
-  createRawMuseObservable,
-  injectMuseMarker
+  createRawMuseObservable
 } from "../utils/eeg/muse";
 import {
   CONNECTION_STATUS,
   DEVICES,
-  DEVICE_AVAILABILITY
+  DEVICE_AVAILABILITY,
+  PLOTTING_INTERVAL,
+  EMOTIV_CHANNELS,
+  MUSE_CHANNELS
 } from "../constants/constants";
 
 export const SET_CLIENT = "SET_CLIENT";
@@ -43,6 +36,7 @@ export const SET_CONNECTION_STATUS = "SET_CONNECTION_STATUS";
 export const SET_DEVICE_INFO = "SET_DEVICE_INFO";
 export const SET_AVAILABLE_DEVICES = "SET_AVAILABLE_DEVICES";
 export const SET_RAW_OBSERVABLE = "SET_RAW_OBSERVABLE";
+export const SET_SIGNAL_OBSERVABLE = "SET_SIGNAL_OBSERVABLE";
 export const DEVICE_CLEANUP = "DEVICE_CLEANUP";
 
 // -------------------------------------------------------------------------
@@ -56,6 +50,11 @@ const setClient = payload => ({
 const setRawObservable = payload => ({
   payload,
   type: SET_RAW_OBSERVABLE
+});
+
+const setSignalQualityObservable = payload => ({
+  payload,
+  type: SET_SIGNAL_OBSERVABLE
 });
 
 const setAvailableDevices = payload => ({
@@ -153,7 +152,7 @@ const connectEpic = (action$, store) =>
     })
   );
 
-  // TODO: Bring this back and make it only look for disconnection events
+// TODO: Bring this back and make it only look for disconnection events
 // const autoConnectEpic = action$ =>
 //   action$.ofType(SET_AVAILABLE_DEVICES).pipe(
 //     pluck("payload"),
@@ -174,7 +173,31 @@ const setRawObservableEpic = (action$, store) =>
         createRawMuseObservable(store.getState().device.client)
       );
     }),
-    map(setRawObservable)
+    mergeMap(observable =>
+      Observable.of(
+        setRawObservable(observable),
+        setSignalQualityObservable(
+          observable.pipe(
+            addInfo({
+              samplingRate: 256
+            }),
+            epoch({
+              duration: (PLOTTING_INTERVAL * 256) / 1000,
+              interval: (PLOTTING_INTERVAL * 256) / 1000
+            }),
+            bandpassFilter({
+              nbChannels:
+                store.getState().device.deviceType === DEVICES.EMOTIV
+                  ? EMOTIV_CHANNELS.length
+                  : MUSE_CHANNELS.length,
+              lowCutoff: 1,
+              highCutoff: 50
+            }),
+            addSignalQuality()
+          )
+        )
+      )
+    )
   );
 
 // const connectionStatusListenerEpic = action$ =>
